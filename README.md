@@ -38,7 +38,11 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 </br>
 
 # Tóm tắt quá trình hoạt động
-
+> InternetHost gửi yêu cầu tới WebServers.
+> WebServers xử lý các yêu cầu và phản hồi lại InternetHost.
+> Đồng thời, Packet Mirroring Policy sao chép toàn bộ lưu lượng từ WebServers (cả vào và ra).
+> Lưu lượng sao chép được chuyển đến ILB Collectors và tiếp tục đến CollectorIDS.
+> CollectorIDS phân tích lưu lượng, so sánh với các signatures để phát hiện các mối đe dọa hoặc sự cố. 
 # Các bước thực hiện
 
 ## Bước 1: Xây dựng 2 máy chủ ảo Virtual Private Cloud (VPC) là 2 WebServer và một máy chủ ảo có vai trò là CollectorIDS
@@ -198,4 +202,32 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
        --subnet=dm-stamford-REGION-ids \
        --ip-protocol=TCP \
        --ports=all
-## Bước 5: Tải open source IDS Suricata 
+## Bước 5: Cài đặt và cấu hình phần mềm mã nguồn mở IDS-Suricata
+- Kết nối trong SSH với VM IDS
+- Từ Bảng điều khiển đám mây, trong menu điều hướng, điều hướng đến Compute Engine > VM Instances.
+
+![image](https://github.com/user-attachments/assets/d07d533e-2c99-4248-88d6-f1a8684f6974)
+</br>
+
+![image](https://github.com/user-attachments/assets/2ee2afb4-b2b5-45bd-9435-11533838afd3)
+
+- Một cửa sổ mới mở ra, cho phép ta chạy các lệnh trong IDS VM. Cập nhật VM IDS:
+
+      sudo apt-get update -y
+  
+- Cài đặt các gói dữ liệu phụ thuộc Suricata:
+
+      sudo apt-get install libpcre3-dbg libpcre3-dev autoconf automake libtool libpcap-dev libnet1-dev libyaml-dev zlib1g-dev libcap-ng-dev libmagic-dev libjansson-dev libjansson4 -y
+  </br>
+      
+      sudo apt-get install libnspr4-dev -y
+   </br>
+      
+      sudo apt-get install libnss3-dev -y
+   </br>
+      
+      sudo apt-get install liblz4-dev -y
+   </br>
+      
+      sudo apt install rustc cargo -y
+   </br>
