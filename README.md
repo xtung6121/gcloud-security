@@ -39,10 +39,10 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
 # Tóm tắt quá trình hoạt động
 > InternetHost gửi yêu cầu tới WebServers.
-> WebServers xử lý các yêu cầu và phản hồi lại InternetHost.
-> Đồng thời, Packet Mirroring Policy sao chép toàn bộ lưu lượng từ WebServers (cả vào và ra).
-> Lưu lượng sao chép được chuyển đến ILB Collectors và tiếp tục đến CollectorIDS.
-> CollectorIDS phân tích lưu lượng, so sánh với các signatures để phát hiện các mối đe dọa hoặc sự cố. 
+>> WebServers xử lý các yêu cầu và phản hồi lại InternetHost.
+>> Đồng thời, Packet Mirroring Policy sao chép toàn bộ lưu lượng từ WebServers (cả vào và ra).
+>>> Lưu lượng sao chép được chuyển đến ILB Collectors và tiếp tục đến CollectorIDS.
+>>> CollectorIDS phân tích lưu lượng, so sánh với các signatures để phát hiện các mối đe dọa hoặc sự cố. 
 # Các bước thực hiện
 
 ## Bước 1: Xây dựng 2 máy chủ ảo Virtual Private Cloud (VPC) là 2 WebServer và một máy chủ ảo có vai trò là CollectorIDS
@@ -231,3 +231,183 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
       
       sudo apt install rustc cargo -y
    </br>
+   
+- Cài đặt Suricata
+
+      sudo add-apt-repository ppa:oisf/suricata-stable -y
+  </br>
+      
+      sudo apt-get update -y
+    </br>
+      
+      sudo apt-get install suricata -y
+    </br>
+
+- Kiểm tra Suricata
+      suricata -V
+
+## Bước 6: Cấu hình và kiểm tra Suricata
+
+-	Các lệnh và các bước trong phần tiếp theo cũng phải được thực thi trong SSH của IDS/Suricata VM.
+- Dừng dịch vụ Suricata và lưu tệp cấu hình mặc định:
+
+      sudo systemctl stop suricata
+</br>
+
+    sudo cp /etc/suricata/suricata.yaml
+    /etc/suricata/suricata.backup
+
+- Tải xuống và thay thế tệp cấu hình Suricata mới và tệp quy tắc viết tắt
+</br>
+
+- Tệp cấu hình mới cập nhật giao diện trình thu thập và chỉ cảnh báo về một phần nhỏ lưu lượng truy cập, như được định cấu hình trong tệp my.rules và suricata.yaml. Các cấu hình mặc định của bộ quy tắc và cảnh báo Suricata vẫn giữ nguyên. Chạy các lệnh sau để sao chép các tệp:
+</br>
+
+      wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/suricata.yaml
+  </br>
+    
+      wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/my.rules
+  </br>
+
+      sudo mkdir /etc/suricata/poc-rules
+  </br>
+    
+      sudo cp my.rules /etc/suricata/poc-rules/my.rules
+  </br>
+    
+      sudo cp suricata.yaml /etc/suricata/suricata.yaml
+  </br>
+    
+- Bắt đầu dịch vụ Suricata
+
+Đôi khi dịch vụ cần phải khởi động lại. Lệnh restart được đưa vào ở bước này để giải thích cho khả năng này:
+</br>
+
+        sudo systemctl start suricata
+  </br>
+  
+        sudo systemctl restart suricata
+  
+- Kiểm tra bộ quy tắc cho Suricata, kết quả cho thấy tổng cộng bốn quy tắc và mô tả cho từng quy tắc:
+</br>
+
+      cat /etc/suricata/poc-rules/my.rules
+
+## Bước 7: Cấu hình Packet Mirroring Policy
+
+Việc thiết lập Packet Mirror Policy có thể hoàn thành bằng một lệnh đơn giản hoặc thông qua một "wizard" (trình hướng dẫn) trong GUI. Trong lệnh này, ta chỉ định 5 thuộc tính sau:
+1.	Khu vực (Region)
+2.	Mạng VPC (VPC Network)
+3.	Nguồn cần sao chép (Mirrored Source)
+4.	Bộ thu (Collector)
+5.	Lưu lượng sao chép (Mirrored traffic)
+Không cần chỉ định "lưu lượng sao chép" vì chính sách sẽ được cấu hình để sao chép "tất cả" lưu lượng mà không cần bộ lọc. Chính sách này sẽ sao chép cả lưu lượng vào (ingress) và ra (egress) và chuyển tiếp đến thiết bị Suricata IDS, là một phần của bộ thu ILB.
+</br>
+
+**Cấu hình Packet Mirroring Policy chạy bởi Cloud Shell**
+
+        gcloud compute packet-mirrorings create mirror-dm-stamford-web \
+        --collector-ilb=ilb-dm-stamford-suricata-ilb-REGION \
+        --network=dm-stamford \
+        --mirrored-subnets=dm-stamford-REGION \
+        --region=REGION
+        
+## Bước 8: Sử dụng IDS Suricata phân tích, cảnh bảo và ngăn chặn
+
+Tiếp theo sẽ tạo lưu lượng mạng kích hoạt từng quy tắc này. Các cảnh báo tương ứng sẽ xuất hiện trong nhật ký sự kiện Suricata.
+- TEST1 và TEST2 sẽ được thực hiện từ máy chủ web và sẽ kiểm tra lưu lượng truy cập đi ra.
+- TEST3 và TEST4 sẽ được khởi chạy từ Cloud Shell và kiểm tra lưu lượng truy cập vào.
+
+  #### TEST1: Kiểm tra cảnh báo và quy tắc UDP gửi đi
+-	Chạy lệnh sau từ một trong các máy chủ WEB để tạo lưu lượng DNS gửi đi:
+  
+        dig @8.8.8.8 example.com
+ 	
+- Sau đó xem cảnh báo trong nhật ký sự kiện Suricata của IDS VM.
+- Chuyển sang cửa sổ SSH cho VM IDS
+- Chạy lệnh sau trong cửa sổ SSH của IDS VM:
+  
+        egrep "BAD UDP DNS" /var/log/suricata/eve.json
+  
+- Mục nhật ký sẽ như sau:
+
+>> @GCP: {"timestamp":"2024-12-09T18:30:39.505175+0000","flow_id":142789263209815,"in_iface":"ens4","event_type":"alert","src_ip":"172.21.0.3","src_port":40459,"dest_ip":"8.8.8.8","dest_port":53,"proto":"UDP","alert":{"action":"allowed","gid":1,"signature_id":99996,"rev":1,"signature":"BAD UDP DNS REQUEST","category":"","severity":3},"dns":{"query":[{"type":"query","id":245,"rrname":"example.com","rrtype":"A","tx_id":0}]},"app_proto":"dns","flow":{"pkts_toserver":1,"pkts_toclient":0,"bytes_toserver":82,"bytes_toclient":0,"start":"2024-12-09T18:30:39.505175+0000"}} >>
+
+#### TEST2: Kiểm tra quy tắc/cảnh báo TCP
+- Thực hiện lệnh sau từ một trong các máy chủ WEB để tạo lưu lượng TCP đầu ra:
+  
+        telnet [PUBLIC_IP_WEB2] 6667
+  
+- Sau đó xem cảnh báo trong nhật ký sự kiện Suricata của VM IDS.
+- Chuyển sang cửa sổ SSH cho VM IDS
+-	Chạy lệnh sau từ cửa sổ SSH của IDS VM:
+  
+        egrep "BAD TCP" /var/log/suricata/eve.json
+ 	
+- Mục nhật ký sẽ như sau:
+>> @GCP: {"timestamp":"2024-12-09T18:33:25.112972+0000","flow_id":555043857480012,"in_iface":"ens4","event_type":"alert","src_ip":"172.21.0.3","src_port":52420,"dest_ip":"34.31.192.26","dest_port":6667,"proto":"TCP","alert":{"action":"allowed","gid":1,"signature_id":99999,"rev":1,"signature":"BAD TCP 6667 REQUEST","category":"","severity":3},"flow":{"pkts_toserver":1,"pkts_toclient":0,"bytes_toserver":74,"bytes_toclient":0,"start":"2024-12-09T18:33:25.112972+0000"}} 
+
+#### TEST3: Kiểm tra quy tắc/cảnh báo ICMP đầu vào
+-	Chạy lệnh sau trong Cloud Shell để tạo lưu lượng INPUT ICMP.
+-	Thay thế [PUBLIC_IP_WEB1] bằng địa chỉ IP công cộng của "WEB1".
+  
+        ping -c 3 [PUBLIC_IP_WEB1]
+ 	
+- Sau đó, xem cảnh báo trong nhật ký sự kiện Suricata của VM IDS:
+  
+        egrep "BAD ICMP" /var/log/suricata/eve.json
+
+- Mục nhật ký sẽ như sau:
+
+>> @GCP: {"timestamp":"2024-12-09T18:35:39.832713+0000","flow_id":2190764981073097,"in_iface":"ens4","event_type":"alert","src_ip":"35.198.215.35","src_port":0,"dest_ip":"172.21.0.3","dest_port":0,"proto":"ICMP","icmp_type":8,"icmp_code":0,"alert":{"action":"allowed","gid":1,"signature_id":99998,"rev":1,"signature":"BAD ICMP","category":"","severity":3},"flow":{"pkts_toserver":1,"pkts_toclient":0,"bytes_toserver":98,"bytes_toclient":0,"start":"2024-12-09T18:35:39.832713+0000"}}
+
+### TEST4: Kiểm tra quy tắc/cảnh báo HTTP đầu vào
+Sử dụng trình duyệt web của máy trạm cục bộ hoặc cuộn tròn trong Cloud Shell, mở địa chỉ công khai được gán cho WEB1 cho trang “index.php”, sử dụng giao thức HTTP. 
+</br>
+
+Thay thế [PUBLIC_IP_WEB1] bằng địa chỉ IP công cộng của "WEB1".
+
+        http://[PUBLIC_IP_WEB1]/index.php
+        
+- Sau đó, xem cảnh báo trong nhật ký sự kiện Suricata của VM IDS:
+  
+        egrep "BAD HTTP" /var/log/suricata/eve.json
+  
+- Mục nhật ký sẽ như sau:
+  
+>> @GCP: {"timestamp":"2024-12-09T18:37:06.003529+0000","flow_id":1142322667531643,"in_iface":"ens4","event_type":"alert","src_ip":"1.55.81.218","src_port":5433,"dest_ip":"172.21.0.3","dest_port":80,"proto":"TCP","tx_id":0,"alert":{"action":"allowed","gid":1,"signature_id":99997,"rev":1,"signature":"BAD HTTP PHP REQUEST","category":"","severity":3},"http":{"hostname":"34.46.147.148","url":"/index.php","http_user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0","http_content_type":"text/html","http_method":"GET","protocol":"HTTP/1.1","status":404,"length":275},"app_proto":"http","flow":{"pkts_toserver":7,"pkts_toclient":6,"bytes_toserver":1304,"bytes_toclient":1332,"start":"2024-12-09T18:37:05.470395+0000"}} 
+
+# Mở rộng 
+
+## Install a NGINX web server
+Now you'll install NGINX web server, one of the most popular web servers in the world, to connect your virtual machine to something.
+
+Once SSH'ed, get root access using sudo:
+
+      sudo su -
+As the root user, update your OS:
+
+      apt-get update
+(Output)
+
+Get:1 http://security.debian.org stretch/updates InRelease [94.3 kB]
+Ign http://deb.debian.org strech InRelease
+Get:2 http://deb.debian.org strech-updates InRelease [91.0 kB]
+...
+Install NGINX:
+
+      apt-get install nginx -y
+(Output)
+
+Reading package lists... Done
+Building dependency tree
+Reading state information... Done
+The following additional packages will be installed:
+...
+Check that NGINX is running:
+
+      ps auwx | grep nginx
+
+## Thống kê lưu lượng mạng
+
+
