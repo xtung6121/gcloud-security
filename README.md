@@ -5,15 +5,14 @@ Tài liệu sử dụng gcloud shell. [Google Cloud gcloud Overview.](https://cl
 Tài liệu về packet mirroring. [Use Packet Mirroring](https://cloud.google.com/vpc/docs/using-packet-mirroring)
 </br>
 
-**Understanding Regions and Zones**
+**Hiểu về Regions and Zones**
 
-Certain Compute Engine resources live in regions or zones. A region is a specific geographical location where you can run your resources. Each region has one or more zones. For example, the us-central1 region denotes a region in the Central United States that has zones us-central1-a, us-central1-b, us-central1-c, and us-central1-f.
+Tài nguyên tồn tại trong một vùng được gọi là tài nguyên theo vùng. Các phiên bản máy ảo và đĩa cứng không thay đổi tồn tại trong một vùng. Để gắn một đĩa cứng không thay đổi vào một phiên bản máy ảo, cả hai tài nguyên phải nằm trong cùng một vùng. Tương tự, nếu muốn gán một địa chỉ IP tĩnh cho một phiên bản, phiên bản đó phải nằm trong cùng khu vực với địa chỉ IP tĩnh.
 
-regions_and_zones.png
+Các ví dụ về REGION và ZONES: us-central1-a, us-central1-b, us-central1-c, and us-central1-f.
 
-Resources that live in a zone are referred to as zonal resources. Virtual machine Instances and persistent disks live in a zone. To attach a persistent disk to a virtual machine instance, both resources must be in the same zone. Similarly, if you want to assign a static IP address to an instance, the instance must be in the same region as the static IP.
+Chi tiết về Regions và zones. [Regions & Zones documentation](https://cloud.google.com/compute/docs/regions-zones)
 
-Learn more about regions and zones and see a complete list in Regions & Zones documentation.
 # Overview 
 Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tương tác với nhau để xử lý và quản lý lưu lượng từ Internet![image](https://github.com/user-attachments/assets/f43ff550-b25f-4dfb-9fa2-7863b06d8ece)
 
@@ -115,7 +114,7 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 </br>
 
 ## Bước 3: Tạo máy ảo Virtual machines
-**Chuẩn bị một máy chủ Ubuntu trong khu vực us-central1 và cài đặt một dịch vụ web đơn giản**
+**Chuẩn bị một máy chủ Ubuntu trong khu vực REGION (tùy chọn) và cài đặt một dịch vụ web đơn giản**
 
         gcloud compute instance-templates create template-dm-stamford-web-REGION \
         --region=REGION \
@@ -133,3 +132,70 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
           echo "Page served from: $vm_hostname" | \
           tee /var/www/html/index.html
           systemctl restart apache2'
+
+  **Tạo một nhóm phiên bản được quản lý cho các máy chủ web, lệnh này sử dụng mẫu phiên bản từ bước trước để tạo hai máy chủ web**
+
+      gcloud compute instance-groups managed create mig-dm-stamford-web-REGION \
+        --template=template-dm-stamford-web-REGION \
+        --size=2 \
+        --zone="ZONE"
+
+#### Tạo một phiên bản cho IDS VM
+- Chuẩn bị một máy chủ Ubuntu ở khu vực REGION mà không có địa chỉ IP công cộng
+  
+       gcloud compute instance-templates create template-dm-stamford-ids-REGION \
+        --region=REGION \
+        --network=dm-stamford \
+        --no-address \
+        --subnet=dm-stamford-REGION-ids \
+        --image=ubuntu-1604-xenial-v20200807 \
+        --image-project=ubuntu-os-cloud \
+        --tags=ids,webserver \
+        --metadata=startup-script='#! /bin/bash
+          apt-get update
+          apt-get install apache2 -y
+          vm_hostname="$(curl -H "Metadata-Flavor:Google" \
+          http://169.254.169.254/computeMetadata/v1/instance/name)"
+          echo "Page served from: $vm_hostname" | \
+          tee /var/www/html/index.html
+          systemctl restart apache2'
+#### Tạo một nhóm phiên bản được quản lý cho IDS VM
+- Lệnh này sử dụng mẫu phiên bản từ bước trước để tạo VM sẽ được định cấu hình thành IDS. Cài đặt Suricata sẽ được đề cập trong phần sau.
+
+        gcloud compute instance-groups managed create mig-dm-stamford-ids-REGION \
+          --template=template-dm-stamford-ids-REGION \
+          --size=1 \
+          --zone="ZONE"
+
+## Bước 4: Tạo cân bằng tải nội bộ (Internal Load Balancer - ILBCollector)
+
+  ### 1. Ánh xạ gói tin sử dụng bộ cân bằng tải nội bộ (ILB) để chuyển tiếp lưu lượng được phản chiếu tới collector. Trong trường hợp này, collector chứa một máy ảo
+     
+         gcloud compute health-checks create tcp hc-tcp-80 --port 80
+
+  ### 2. Tạo một nhóm dịch vụ phụ trợ để sử dụng cho ILB:
+
+        gcloud compute backend-services create be-dm-stamford-suricata-REGION \
+        --load-balancing-scheme=INTERNAL \
+        --health-checks=hc-tcp-80 \
+        --network=dm-stamford \
+        --protocol=TCP \
+        --region=REGION
+### 3. Thêm nhóm phiên bản do IDS quản lý đã được tạo vào nhóm dịch vụ phụ trợ đã tạo ở bước trước:
+
+        gcloud compute backend-services add-backend be-dm-stamford-suricata-REGION \
+        --instance-group=mig-dm-stamford-ids-REGION \
+        --instance-group-zone="ZONE" \
+        --region=REGION
+### 4. Tạo quy tắc chuyển tiếp giao diện để đóng vai trò là điểm cuối bộ sưu tập:
+
+       gcloud compute forwarding-rules create ilb-dm-stamford-suricata-ilb-REGION \
+       --load-balancing-scheme=INTERNAL \
+       --backend-service be-dm-stamford-suricata-REGION \
+       --is-mirroring-collector \
+       --network=dm-stamford \
+       --region=REGION \
+       --subnet=dm-stamford-REGION-ids \
+       --ip-protocol=TCP \
+       --ports=all
+## Bước 5: Tải open source IDS Suricata 
