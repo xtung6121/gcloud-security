@@ -47,19 +47,19 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
 ## Bước 1: Xây dựng 2 máy chủ ảo Virtual Private Cloud (VPC) là 2 WebServer và một máy chủ ảo có vai trò là CollectorIDS
 ### 1. Tạo VPC networks
-    gcloud compute networks create dm-stamford \
-    --subnet-mode=custom
+          gcloud compute networks create dm-stamford \
+      --subnet-mode=custom
 
 ### 2. Thêm vùng dữ liệu cho mạng con VPC
-    gcloud compute networks subnets create dm-stamford-REGION \
-    --range=172.21.0.0/24 \
-    --network=dm-stamford \
-    --region=REGION
+          gcloud compute networks subnets create dm-stamford-us-central1 \
+        --range=172.21.0.0/24 \
+        --network=dm-stamford \
+        --region=us-central1
 ### 3. Thêm một mạng con cho Collector trong Vùng 
-    gcloud compute networks subnets create dm-stamford-REGION-ids \
-    --range=172.21.1.0/24 \
-    --network=dm-stamford \
-    --region=REGION
+        gcloud compute networks subnets create dm-stamford-us-central1-ids \
+        --range=172.21.1.0/24 \
+        --network=dm-stamford \
+        --region=us-central1
 ## Bước 2: Tạo quy tắc tường lửa và cấu hình Cloud NAT (Cloud Network Address Translation)
 - **Quy tắc 1** cho phép cổng HTTP tiêu chuẩn (TCP 80) và giao thức ICMP trên tất cả các máy ảo từ tất cả các nguồn
 </br>
@@ -73,46 +73,46 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
 **Chi tiết từng câu lệnh**
 
-    gcloud compute firewall-rules create fw-dm-stamford-allow-any-web \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=dm-stamford \
-    --action=ALLOW \
-    --rules=tcp:80,icmp \
-    --source-ranges=0.0.0.0/0
+          gcloud compute firewall-rules create fw-dm-stamford-allow-any-web \
+      --direction=INGRESS \
+      --priority=1000 \
+      --network=dm-stamford \
+      --action=ALLOW \
+      --rules=tcp:80,icmp \
+      --source-ranges=0.0.0.0/0
 </br>
 
-    gcloud compute firewall-rules create fw-dm-stamford-ids-any-any \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=dm-stamford \
-    --action=ALLOW \
-    --rules=all \
-    --source-ranges=0.0.0.0/0 \
-    --target-tags=ids
+          gcloud compute firewall-rules create fw-dm-stamford-ids-any-any \
+      --direction=INGRESS \
+      --priority=1000 \
+      --network=dm-stamford \
+      --action=ALLOW \
+      --rules=all \
+      --source-ranges=0.0.0.0/0 \
+      --target-tags=ids
 </br>
 
-    gcloud compute firewall-rules create fw-dm-stamford-iapproxy \
-    --direction=INGRESS \
-    --priority=1000 \
-    --network=dm-stamford \
-    --action=ALLOW \
-    --rules=tcp:22,icmp \
-    --source-ranges=35.235.240.0/20
+      gcloud compute firewall-rules create fw-dm-stamford-iapproxy \
+      --direction=INGRESS \
+      --priority=1000 \
+      --network=dm-stamford \
+      --action=ALLOW \
+      --rules=tcp:22,icmp \
+      --source-ranges=35.235.240.0/20
 </br>
 
 **Tạo bộ định tuyến Cloud (Cloud NAT)**
 
-    gcloud compute routers create router-stamford-nat-REGION \
-    --region=REGION \
-    --network=dm-stamford
+      gcloud compute routers create router-stamford-nat-REGION \
+      --region=REGION \
+      --network=dm-stamford
 </br>
 
 **Cấu hình cho NAT**
 
-    gcloud compute routers nats create nat-gw-dm-stamford-REGION \
-    --router=router-stamford-nat-REGION \
-    --router-region=REGION \
+       gcloud compute routers nats create nat-gw-dm-stamford-us-central1 \
+    --router=router-stamford-nat-us-central1 \
+    --router-region=us-central1 \
     --auto-allocate-nat-external-ips \
     --nat-all-subnet-ip-ranges
 </br>
@@ -120,10 +120,10 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 ## Bước 3: Tạo máy ảo Virtual machines
 **Chuẩn bị một máy chủ Ubuntu trong khu vực REGION (tùy chọn) và cài đặt một dịch vụ web đơn giản**
 
-        gcloud compute instance-templates create template-dm-stamford-web-REGION \
-        --region=REGION \
+                gcloud compute instance-templates create template-dm-stamford-web-us-central1 \
+        --region=us-central1 \
         --network=dm-stamford \
-        --subnet=dm-stamford-REGION \
+        --subnet=dm-stamford-us-central1 \
         --machine-type=e2-small \
         --image=ubuntu-1604-xenial-v20200807 \
         --image-project=ubuntu-os-cloud \
@@ -139,37 +139,37 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
   **Tạo một nhóm phiên bản được quản lý cho các máy chủ web, lệnh này sử dụng mẫu phiên bản từ bước trước để tạo hai máy chủ web**
 
-      gcloud compute instance-groups managed create mig-dm-stamford-web-REGION \
-        --template=template-dm-stamford-web-REGION \
+        gcloud compute instance-groups managed create mig-dm-stamford-web-us-central1 \
+        --template=template-dm-stamford-web-us-central1 \
         --size=2 \
-        --zone="ZONE"
+        --zone=us-central1-a
 
 #### Tạo một phiên bản cho IDS VM
 - Chuẩn bị một máy chủ Ubuntu ở khu vực REGION mà không có địa chỉ IP công cộng
   
-       gcloud compute instance-templates create template-dm-stamford-ids-REGION \
-        --region=REGION \
-        --network=dm-stamford \
-        --no-address \
-        --subnet=dm-stamford-REGION-ids \
-        --image=ubuntu-1604-xenial-v20200807 \
-        --image-project=ubuntu-os-cloud \
-        --tags=ids,webserver \
-        --metadata=startup-script='#! /bin/bash
-          apt-get update
-          apt-get install apache2 -y
-          vm_hostname="$(curl -H "Metadata-Flavor:Google" \
-          http://169.254.169.254/computeMetadata/v1/instance/name)"
-          echo "Page served from: $vm_hostname" | \
-          tee /var/www/html/index.html
-          systemctl restart apache2'
+            gcloud compute instance-templates create template-dm-stamford-ids-us-central1 \
+      --region=us-central1 \
+      --network=dm-stamford \
+      --no-address \
+      --subnet=dm-stamford-us-central1-ids \
+      --image=ubuntu-1604-xenial-v20200807 \
+      --image-project=ubuntu-os-cloud \
+      --tags=ids,webserver \
+      --metadata=startup-script='#! /bin/bash
+        apt-get update
+        apt-get install apache2 -y
+        vm_hostname="$(curl -H "Metadata-Flavor:Google" \
+        http://169.254.169.254/computeMetadata/v1/instance/name)"
+        echo "Page served from: $vm_hostname" | \
+        tee /var/www/html/index.html
+        systemctl restart apache2'
 #### Tạo một nhóm phiên bản được quản lý cho IDS VM
 - Lệnh này sử dụng mẫu phiên bản từ bước trước để tạo VM sẽ được định cấu hình thành IDS. Cài đặt Suricata sẽ được đề cập trong phần sau.
 
-        gcloud compute instance-groups managed create mig-dm-stamford-ids-REGION \
-          --template=template-dm-stamford-ids-REGION \
-          --size=1 \
-          --zone="ZONE"
+         gcloud compute instance-groups managed create mig-dm-stamford-ids-us-central1 \
+      --template=template-dm-stamford-ids-us-central1 \
+      --size=1 \
+      --zone=us-central1-a
 
 ## Bước 4: Tạo cân bằng tải nội bộ (Internal Load Balancer - ILBCollector)
 
@@ -179,27 +179,27 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
   ### 2. Tạo một nhóm dịch vụ phụ trợ để sử dụng cho ILB:
 
-        gcloud compute backend-services create be-dm-stamford-suricata-REGION \
-        --load-balancing-scheme=INTERNAL \
-        --health-checks=hc-tcp-80 \
-        --network=dm-stamford \
-        --protocol=TCP \
-        --region=REGION
+              gcloud compute backend-services create be-dm-stamford-suricata-us-central1 \
+      --load-balancing-scheme=INTERNAL \
+      --health-checks=hc-tcp-80 \
+      --network=dm-stamford \
+      --protocol=TCP \
+      --region=us-central1
 ### 3. Thêm nhóm phiên bản do IDS quản lý đã được tạo vào nhóm dịch vụ phụ trợ đã tạo ở bước trước:
 
-        gcloud compute backend-services add-backend be-dm-stamford-suricata-REGION \
-        --instance-group=mig-dm-stamford-ids-REGION \
-        --instance-group-zone="ZONE" \
-        --region=REGION
+           gcloud compute backend-services add-backend be-dm-stamford-suricata-us-central1 \
+    --instance-group=mig-dm-stamford-ids-us-central1 \
+    --instance-group-zone=us-central1-a \
+    --region=us-central1
 ### 4. Tạo quy tắc chuyển tiếp giao diện để đóng vai trò là điểm cuối bộ sưu tập:
 
-       gcloud compute forwarding-rules create ilb-dm-stamford-suricata-ilb-REGION \
+             gcloud compute forwarding-rules create ilb-dm-stamford-suricata-ilb-us-central1 \
        --load-balancing-scheme=INTERNAL \
-       --backend-service be-dm-stamford-suricata-REGION \
+       --backend-service be-dm-stamford-suricata-us-central1 \
        --is-mirroring-collector \
        --network=dm-stamford \
-       --region=REGION \
-       --subnet=dm-stamford-REGION-ids \
+       --region=us-central1 \
+       --subnet=dm-stamford-us-central1-ids \
        --ip-protocol=TCP \
        --ports=all
 ## Bước 5: Cài đặt và cấu hình phần mềm mã nguồn mở IDS-Suricata
@@ -213,23 +213,23 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
 - Một cửa sổ mới mở ra, cho phép ta chạy các lệnh trong IDS VM. Cập nhật VM IDS:
 
-      sudo apt-get update -y
+        sudo apt-get update -y
   
 - Cài đặt các gói dữ liệu phụ thuộc Suricata:
 
-      sudo apt-get install libpcre3-dbg libpcre3-dev autoconf automake libtool libpcap-dev libnet1-dev libyaml-dev zlib1g-dev libcap-ng-dev libmagic-dev libjansson-dev libjansson4 -y
+        sudo apt-get install libpcre3-dbg libpcre3-dev autoconf automake libtool libpcap-dev libnet1-dev libyaml-dev zlib1g-dev libcap-ng-dev libmagic-dev libjansson-dev libjansson4 -y
   </br>
       
-      sudo apt-get install libnspr4-dev -y
+        sudo apt-get install libnspr4-dev -y
    </br>
       
-      sudo apt-get install libnss3-dev -y
+        sudo apt-get install libnss3-dev -y
    </br>
       
-      sudo apt-get install liblz4-dev -y
+        sudo apt-get install liblz4-dev -y
    </br>
       
-      sudo apt install rustc cargo -y
+        sudo apt install rustc cargo -y
    </br>
    
 - Cài đặt Suricata
@@ -251,11 +251,10 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 -	Các lệnh và các bước trong phần tiếp theo cũng phải được thực thi trong SSH của IDS/Suricata VM.
 - Dừng dịch vụ Suricata và lưu tệp cấu hình mặc định:
 
-      sudo systemctl stop suricata
+        sudo systemctl stop suricata
 </br>
 
-    sudo cp /etc/suricata/suricata.yaml
-    /etc/suricata/suricata.backup
+      sudo cp /etc/suricata/suricata.yaml /etc/suricata/suricata.backup
 
 - Tải xuống và thay thế tệp cấu hình Suricata mới và tệp quy tắc viết tắt
 </br>
@@ -263,19 +262,19 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 - Tệp cấu hình mới cập nhật giao diện trình thu thập và chỉ cảnh báo về một phần nhỏ lưu lượng truy cập, như được định cấu hình trong tệp my.rules và suricata.yaml. Các cấu hình mặc định của bộ quy tắc và cảnh báo Suricata vẫn giữ nguyên. Chạy các lệnh sau để sao chép các tệp:
 </br>
 
-      wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/suricata.yaml
+        wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/suricata.yaml
   </br>
     
-      wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/my.rules
+        wget https://storage.googleapis.com/tech-academy-enablement/GCP-Packet-Mirroring-with-OpenSource-IDS/my.rules
   </br>
 
-      sudo mkdir /etc/suricata/poc-rules
+         sudo mkdir /etc/suricata/poc-rules
   </br>
     
-      sudo cp my.rules /etc/suricata/poc-rules/my.rules
+        sudo cp my.rules /etc/suricata/poc-rules/my.rules
   </br>
     
-      sudo cp suricata.yaml /etc/suricata/suricata.yaml
+        sudo cp suricata.yaml /etc/suricata/suricata.yaml
   </br>
     
 - Bắt đầu dịch vụ Suricata
@@ -291,7 +290,7 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 - Kiểm tra bộ quy tắc cho Suricata, kết quả cho thấy tổng cộng bốn quy tắc và mô tả cho từng quy tắc:
 </br>
 
-      cat /etc/suricata/poc-rules/my.rules
+        cat /etc/suricata/poc-rules/my.rules
 
 ## Bước 7: Cấu hình Packet Mirroring Policy
 
@@ -306,11 +305,11 @@ Không cần chỉ định "lưu lượng sao chép" vì chính sách sẽ đư�
 
 **Cấu hình Packet Mirroring Policy chạy bởi Cloud Shell**
 
-        gcloud compute packet-mirrorings create mirror-dm-stamford-web \
-        --collector-ilb=ilb-dm-stamford-suricata-ilb-REGION \
+         gcloud compute packet-mirrorings create mirror-dm-stamford-web \
+        --collector-ilb=ilb-dm-stamford-suricata-ilb-us-central1 \
         --network=dm-stamford \
-        --mirrored-subnets=dm-stamford-REGION \
-        --region=REGION
+        --mirrored-subnets=dm-stamford-us-central1 \
+        --region=us-central1
         
 ## Bước 8: Sử dụng IDS Suricata phân tích, cảnh bảo và ngăn chặn
 
