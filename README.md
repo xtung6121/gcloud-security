@@ -378,35 +378,6 @@ Thay thế [PUBLIC_IP_WEB1] bằng địa chỉ IP công cộng của "WEB1".
 
 # Mở rộng 
 
-## Install a NGINX web server
-Now you'll install NGINX web server, one of the most popular web servers in the world, to connect your virtual machine to something.
-
-Once SSH'ed, get root access using sudo:
-
-      sudo su -
-As the root user, update your OS:
-
-      apt-get update
-(Output)
-
-Get:1 http://security.debian.org stretch/updates InRelease [94.3 kB]
-Ign http://deb.debian.org strech InRelease
-Get:2 http://deb.debian.org strech-updates InRelease [91.0 kB]
-...
-Install NGINX:
-
-      apt-get install nginx -y
-(Output)
-
-Reading package lists... Done
-Building dependency tree
-Reading state information... Done
-The following additional packages will be installed:
-...
-Check that NGINX is running:
-
-      ps auwx | grep nginx
-
 ## Thống kê lưu lượng mạng
 
 
