@@ -377,7 +377,18 @@ Thay thế [PUBLIC_IP_WEB1] bằng địa chỉ IP công cộng của "WEB1".
 >> @GCP: {"timestamp":"2024-12-09T18:37:06.003529+0000","flow_id":1142322667531643,"in_iface":"ens4","event_type":"alert","src_ip":"1.55.81.218","src_port":5433,"dest_ip":"172.21.0.3","dest_port":80,"proto":"TCP","tx_id":0,"alert":{"action":"allowed","gid":1,"signature_id":99997,"rev":1,"signature":"BAD HTTP PHP REQUEST","category":"","severity":3},"http":{"hostname":"34.46.147.148","url":"/index.php","http_user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0","http_content_type":"text/html","http_method":"GET","protocol":"HTTP/1.1","status":404,"length":275},"app_proto":"http","flow":{"pkts_toserver":7,"pkts_toclient":6,"bytes_toserver":1304,"bytes_toclient":1332,"start":"2024-12-09T18:37:05.470395+0000"}} 
 
 # Mở rộng 
+### Tạo một website đơn giản trên WebServer là Ubuntu
+#### 1. Để mở cửa sổ terminal của VM, vào Connect, click SSH.
 
+#### 2. Cập nhật các packet-list của máy ảo VM
+        sudo apt-get update
+#### 3. Tải Aphache2 HTTP Server
+        sudo apt-get install apache2 php7.0
+#### 4. Viết lại Aphache WebServer mặc định trang web sẽ như sau: 
+        echo '<!doctype html><html><body><h1>Hello World!</h1></body></html>' | sudo tee /var/www/html/index.html
+### Mở Server bằng External IP (mạng công cộng) và dán lên trình duyệt sau đó xem kết quả <3
+        
+        
 ## Thống kê lưu lượng mạng
 
 
