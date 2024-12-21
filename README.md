@@ -103,9 +103,10 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
 
 **Tạo bộ định tuyến Cloud (Cloud NAT)**
 
-      gcloud compute routers create router-stamford-nat-REGION \
-      --region=REGION \
+           gcloud compute routers create router-stamford-nat-us-central1 \
+      --region=us-central1 \
       --network=dm-stamford
+
 </br>
 
 **Cấu hình cho NAT**
