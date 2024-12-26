@@ -313,7 +313,7 @@ Không cần chỉ định "lưu lượng sao chép" vì chính sách sẽ đư�
         --mirrored-subnets=dm-stamford-us-central1 \
         --region=us-central1
         
-## Bước 8: Sử dụng IDS Suricata phân tích, cảnh bảo và ngăn chặn
+## THỰC NGHIỆM: Sử dụng IDS Suricata phân tích, cảnh bảo và ngăn chặn
 
 Tiếp theo sẽ tạo lưu lượng mạng kích hoạt từng quy tắc này. Các cảnh báo tương ứng sẽ xuất hiện trong nhật ký sự kiện Suricata.
 - TEST1 và TEST2 sẽ được thực hiện từ máy chủ web và sẽ kiểm tra lưu lượng truy cập đi ra.
@@ -377,6 +377,11 @@ Thay thế [PUBLIC_IP_WEB1] bằng địa chỉ IP công cộng của "WEB1".
 - Mục nhật ký sẽ như sau:
   
 >> @GCP: {"timestamp":"2024-12-09T18:37:06.003529+0000","flow_id":1142322667531643,"in_iface":"ens4","event_type":"alert","src_ip":"1.55.81.218","src_port":5433,"dest_ip":"172.21.0.3","dest_port":80,"proto":"TCP","tx_id":0,"alert":{"action":"allowed","gid":1,"signature_id":99997,"rev":1,"signature":"BAD HTTP PHP REQUEST","category":"","severity":3},"http":{"hostname":"34.46.147.148","url":"/index.php","http_user_agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0","http_content_type":"text/html","http_method":"GET","protocol":"HTTP/1.1","status":404,"length":275},"app_proto":"http","flow":{"pkts_toserver":7,"pkts_toclient":6,"bytes_toserver":1304,"bytes_toclient":1332,"start":"2024-12-09T18:37:05.470395+0000"}} 
+
+### TEST 5: Quy tắc phát hiện SMB bất thường
+
+      alert smb any any -> any any (msg:"Suspicious SMB Traffic Detected"; sid:1000006; rev:1;)
+
 
 # Mở rộng 
 ### Tạo một website đơn giản trên WebServer là Ubuntu
