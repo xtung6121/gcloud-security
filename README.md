@@ -1,5 +1,5 @@
 # Packet Mirroring 
-Tài liệu sử dụng gcloud shell. [Google Cloud gcloud Overview.](https://cloud.google.com/sdk/gcloud)
+Tài liệu sử dụng gcloud shell. [Google Cloud Overview.](https://cloud.google.com/sdk/gcloud)
 </br>
 
 Tài liệu về packet mirroring. [Use Packet Mirroring](https://cloud.google.com/vpc/docs/using-packet-mirroring)
@@ -243,9 +243,10 @@ Sơ đồ này cho thấy cách mà các thành phần trong Google Cloud tươn
       
       sudo apt-get install suricata -y
     </br>
-
+    
 - Kiểm tra Suricata
-      suricata -V
+
+        suricata -V
 
 ## Bước 6: Cấu hình và kiểm tra Suricata
 
